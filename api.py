@@ -1,11 +1,10 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
-from sys import stdout
 from urllib.parse import parse_qs, urlparse
 import cv2
 import numpy as np
 from sift import SIFT
-from os import getenv
+import os
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -71,11 +70,33 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    port = int(getenv('PORT') or 0)
+    port = int(os.getenv('PORT') or 0)
     server = HTTPServer(('127.0.0.1', port), Handler)
-    json.dump({'port': server.server_address[1]}, stdout)
-    print()
-    server.serve_forever()
+    port = server.server_address[1]
+
+    pid_dir = os.getenv('PID_DIR')
+    pid_file = pid_dir and os.path.join(pid_dir, "%d.json" % os.getpid())
+
+    if pid_file is not None:
+        os.makedirs(os.path.dirname(pid_file), exist_ok=True)
+        with open(pid_file, mode='w') as file:
+            json.dump({
+                'port': port
+            }, file)
+
+    try:
+        server.serve_forever()
+    finally:
+        if pid_file is not None:
+            try:
+                os.unlink(pid_file)
+            except Exception:
+                pass
+
+            try:
+                os.removedirs(os.path.dirname(pid_file))
+            except Exception:
+                pass
 
 
 if __name__ == '__main__':
